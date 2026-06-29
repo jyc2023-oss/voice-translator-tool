@@ -63,6 +63,11 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  align-items: start;
+}
+
+.grid-layout > * {
+  min-width: 0;
 }
 
 .panel {
@@ -72,6 +77,8 @@ a {
   padding: 24px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(20px);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel--full {
@@ -161,6 +168,16 @@ a {
   border-radius: 18px;
   padding: 14px 16px;
   outline: none;
+  min-width: 0;
+}
+
+.job-form textarea {
+  resize: vertical;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.65;
 }
 
 .job-form textarea:focus,
@@ -187,6 +204,7 @@ a {
   border-radius: 22px;
   padding: 18px;
   background: rgba(255, 245, 236, 0.8);
+  min-width: 0;
 }
 
 .voice-picker__header,
@@ -227,8 +245,11 @@ a {
   gap: 12px;
   margin: 16px 0;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 8px;
   scroll-snap-type: x proximity;
+  max-width: 100%;
+  width: 100%;
 }
 
 .voice-slider::-webkit-scrollbar {
@@ -270,6 +291,7 @@ a {
   text-align: left;
   padding: 16px;
   border-radius: 18px;
+  overflow: hidden;
 }
 
 .voice-option strong {
@@ -420,12 +442,15 @@ a {
   border-radius: 22px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.7);
+  min-width: 0;
 }
 
 .translation-copy {
   margin: 12px 0 0;
   color: var(--text-soft);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .voice-grid,
@@ -444,6 +469,7 @@ a {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.68);
   padding: 18px;
+  min-width: 0;
 }
 
 .voice-card__header p,
@@ -451,6 +477,8 @@ a {
 .voice-card__hint {
   margin: 8px 0 0;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .voice-card__error {
