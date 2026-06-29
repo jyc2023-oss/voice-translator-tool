@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { createJob, deleteHistory, getHistory, getJob, getVoiceCatalog } from './api/client'
 import HistoryList from './components/HistoryList'
@@ -91,6 +91,7 @@ function parseVoiceInput(rawValue: string): VoiceSelection[] {
 }
 
 export default function App() {
+  const voiceSliderRef = useRef<HTMLDivElement | null>(null)
   const [sourceText, setSourceText] = useState(EXAMPLE_TEXT)
   const [voiceInput, setVoiceInput] = useState('')
   const [selectedVoiceIds, setSelectedVoiceIds] = useState<string[]>(['EXAVITQu4vr4xnSDxMaL'])
@@ -127,6 +128,14 @@ export default function App() {
 
   const currentStatusMeta = currentJob ? STATUS_META[currentJob.status] : null
   const completedOutputs = currentJob?.outputs.filter((output) => output.status === 'completed').length ?? 0
+
+  function scrollVoiceSlider(direction: 'left' | 'right') {
+    if (!voiceSliderRef.current) {
+      return
+    }
+    const distance = direction === 'left' ? -320 : 320
+    voiceSliderRef.current.scrollBy({ left: distance, behavior: 'smooth' })
+  }
 
   function togglePresetVoice(voiceId: string) {
     setSelectedVoiceIds((current) => {
@@ -282,16 +291,33 @@ export default function App() {
               />
             </label>
 
+            <div className="job-form__footer job-form__footer--inline">
+              <span>{sourceText.trim().length} / 2000 字符</span>
+              <button className="primary-button" type="submit" disabled={submitting}>
+                {submitting ? '提交中...' : '开始生成'}
+              </button>
+            </div>
+
             <div className="voice-picker">
               <div className="voice-picker__header">
                 <div>
                   <span className="eyebrow">Voices</span>
                   <h3>多音色选择</h3>
                 </div>
-                <p>{voiceCatalogLoading ? '正在同步 ElevenLabs 音色...' : `已选择 ${selectedVoices.length} / 3 个音色`}</p>
+                <div className="voice-picker__header-actions">
+                  <p>{voiceCatalogLoading ? '正在同步 ElevenLabs 音色...' : `已选择 ${selectedVoices.length} / 3 个音色`}</p>
+                  <div className="voice-slider__controls">
+                    <button className="slider-button" onClick={() => scrollVoiceSlider('left')} type="button">
+                      ←
+                    </button>
+                    <button className="slider-button" onClick={() => scrollVoiceSlider('right')} type="button">
+                      →
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="voice-picker__grid">
+              <div className="voice-slider" ref={voiceSliderRef}>
                 {voiceCatalog.map((voice) => {
                   const isActive = selectedVoiceIds.includes(voice.voice_id)
                   return (
@@ -340,13 +366,6 @@ export default function App() {
                   />
                 </label>
               ) : null}
-            </div>
-
-            <div className="job-form__footer">
-              <span>{sourceText.trim().length} / 2000 字符</span>
-              <button className="primary-button" type="submit" disabled={submitting}>
-                {submitting ? '提交中...' : '开始生成'}
-              </button>
             </div>
           </form>
 
