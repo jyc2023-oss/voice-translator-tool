@@ -139,8 +139,7 @@ VITE_API_BASE_URL=https://your-render-backend.onrender.com
 
 - `buildCommand: pip install -r requirements.txt`
 - `startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- 持久化磁盘挂载
-- Render 版本的 SQLite 与音频目录路径
+- 免费版可直接部署，不依赖磁盘挂载
 
 ### 官方参考
 
@@ -162,6 +161,7 @@ VITE_API_BASE_URL=https://your-render-backend.onrender.com
 - 逐句高亮目前是估算版，不是强制对齐版
 - 页面会动态读取 ElevenLabs 音色，但“免费可用”仍是基于 `premade` 分类做经验性提示，不等同于官方套餐承诺
 - 默认会把 ElevenLabs TTS 并发限制在 `2`，用于避开免费/低套餐常见的并发上限；如果你升级套餐，可以调高 `ELEVENLABS_MAX_CONCURRENCY`
+- Render 免费套餐不支持持久化磁盘，因此重新部署或休眠唤醒后，本地 SQLite 历史记录和音频文件可能丢失；笔试演示阶段可接受，正式上线建议接对象存储和托管数据库
 - 还未加入限流、鉴权、监控、结构化日志
 - 正式线上建议把音频迁移到对象存储，而不是继续使用本地目录
 

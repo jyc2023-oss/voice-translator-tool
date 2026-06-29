@@ -7,17 +7,9 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    disk:
-      name: voicebridge-data
-      mountPath: /opt/render/project/src/backend/data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
-      - key: DATABASE_URL
-        value: sqlite:////opt/render/project/src/backend/data/app.db
-      - key: AUDIO_DIR
-        value: /opt/render/project/src/backend/data/audio
       - key: BACKEND_URL
         sync: false
       - key: FRONTEND_URL
