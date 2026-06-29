@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+backend/audio/
+backend/app.db
+backend/*.db
+frontend/node_modules/
+frontend/dist/
+AI工程师笔试项目_开发准备信息记录.md
