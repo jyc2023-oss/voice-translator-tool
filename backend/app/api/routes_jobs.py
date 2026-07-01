@@ -6,17 +6,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
+from app.core.errors import AppError, ExternalServiceError
 from app.db.session import SessionLocal, get_db
 from app.models.job import GenerationJob, VoiceOutput
-from app.schemas.job_schema import CreateJobRequest, JobResponse, VoiceSelection, VoiceOutputResponse
+from app.schemas.job_schema import CreateJobRequest, JobResponse, VoiceOutputResponse, VoiceSelection
 from app.services.elevenlabs_service import synthesize_speech
+from app.services.encryption_service import decrypt_text, encrypt_text
 from app.services.sentence_align_service import estimate_alignment
 from app.services.storage_service import build_audio_path, build_audio_url
 from app.services.translation_service import translate_text
 from app.utils.file_utils import remove_file_if_exists
 from app.utils.text_utils import validate_source_text
-from app.core.config import settings
-from app.core.errors import AppError
 
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -63,7 +64,7 @@ def serialize_output(output: VoiceOutput) -> VoiceOutputResponse:
         audio_url=output.audio_url,
         duration_seconds=output.duration_seconds,
         alignment=output.alignment_json or [],
-        error_message=output.error_message,
+        error_message=decrypt_text(output.error_message),
     )
 
 
@@ -71,9 +72,9 @@ def serialize_job(job: GenerationJob) -> JobResponse:
     return JobResponse(
         job_id=job.id,
         status=job.status,
-        source_text=job.source_text,
-        translated_text=job.translated_text,
-        error_message=job.error_message,
+        source_text=decrypt_text(job.source_text) or "",
+        translated_text=decrypt_text(job.translated_text),
+        error_message=decrypt_text(job.error_message),
         created_at=job.created_at,
         updated_at=job.updated_at,
         outputs=[serialize_output(output) for output in job.outputs],
@@ -94,7 +95,7 @@ async def process_single_voice(job_id: str, translated_text: str, voice_id: str,
             "alignment_json": estimate_alignment(translated_text, duration),
             "error_message": None,
         }
-    except Exception as exc:
+    except ExternalServiceError as exc:
         remove_file_if_exists(str(target_path))
         return {
             "voice_id": voice_id,
@@ -104,7 +105,19 @@ async def process_single_voice(job_id: str, translated_text: str, voice_id: str,
             "audio_url": None,
             "duration_seconds": None,
             "alignment_json": [],
-            "error_message": str(exc),
+            "error_message": exc.message,
+        }
+    except Exception:
+        remove_file_if_exists(str(target_path))
+        return {
+            "voice_id": voice_id,
+            "status": "failed",
+            "voice_name": voice_name,
+            "audio_path": None,
+            "audio_url": None,
+            "duration_seconds": None,
+            "alignment_json": [],
+            "error_message": "语音合成失败，请稍后重试。",
         }
 
 
@@ -137,8 +150,11 @@ async def run_job_pipeline(job_id: str) -> None:
         job.status = "translating"
         db.commit()
 
-        translated_text = await translate_text(job.source_text)
-        job.translated_text = translated_text
+        source_text = decrypt_text(job.source_text) or ""
+        translated_text = await translate_text(source_text)
+
+        job.translated_text = encrypt_text(translated_text)
+        job.error_message = None
         job.status = "synthesizing"
         for output in job.outputs:
             output.status = "synthesizing"
@@ -166,18 +182,22 @@ async def run_job_pipeline(job_id: str) -> None:
             output.audio_url = result["audio_url"]
             output.duration_seconds = result["duration_seconds"]
             output.alignment_json = result["alignment_json"]
-            output.error_message = result["error_message"]
+            output.error_message = encrypt_text(result["error_message"])
             if output.status == "completed":
                 success_count += 1
 
-        if success_count:
+        if success_count == len(job.outputs):
             job.status = "completed"
-            job.error_message = None if success_count == len(job.outputs) else "部分音色生成失败。"
+            job.error_message = None
+        elif success_count > 0:
+            job.status = "completed"
+            job.error_message = encrypt_text("部分音色生成失败。")
         else:
             job.status = "failed"
-            job.error_message = "所有音色都生成失败，请检查配置后重试。"
+            job.error_message = encrypt_text("所有音色都生成失败，请检查配置后重试。")
+
         db.commit()
-    except Exception as exc:
+    except ExternalServiceError as exc:
         db.rollback()
         failed_job = (
             db.execute(
@@ -190,11 +210,31 @@ async def run_job_pipeline(job_id: str) -> None:
         )
         if failed_job:
             failed_job.status = "failed"
-            failed_job.error_message = str(exc)
+            failed_job.error_message = encrypt_text(exc.message)
             for output in failed_job.outputs:
                 if output.status != "completed":
                     output.status = "failed"
-                    output.error_message = str(exc)
+                    output.error_message = encrypt_text(exc.message)
+            db.commit()
+    except Exception:
+        db.rollback()
+        failed_job = (
+            db.execute(
+                select(GenerationJob)
+                .options(selectinload(GenerationJob.outputs))
+                .where(GenerationJob.id == job_id)
+            )
+            .scalars()
+            .first()
+        )
+        if failed_job:
+            generic_message = "任务执行失败，请稍后重试。"
+            failed_job.status = "failed"
+            failed_job.error_message = encrypt_text(generic_message)
+            for output in failed_job.outputs:
+                if output.status != "completed":
+                    output.status = "failed"
+                    output.error_message = encrypt_text(generic_message)
             db.commit()
     finally:
         db.close()
@@ -214,7 +254,7 @@ async def create_job(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    job = GenerationJob(source_text=source_text, status="pending")
+    job = GenerationJob(source_text=encrypt_text(source_text) or "", status="pending")
     job.outputs = [
         VoiceOutput(voice_id=voice.voice_id, voice_name=voice.voice_name or voice.voice_id, status="pending")
         for voice in voices

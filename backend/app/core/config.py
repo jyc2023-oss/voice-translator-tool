@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
     openai_model: str | None = Field(default=None, alias="OPENAI_MODEL")
+    field_encryption_key: str | None = Field(default=None, alias="FIELD_ENCRYPTION_KEY")
 
     elevenlabs_api_key: str | None = Field(default=None, alias="ELEVENLABS_API_KEY")
     elevenlabs_default_voice_id: str | None = Field(default=None, alias="ELEVENLABS_DEFAULT_VOICE_ID")

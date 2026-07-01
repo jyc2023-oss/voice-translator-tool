@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.routes_jobs import serialize_job
 from app.db.session import get_db
 from app.models.job import GenerationJob
 from app.schemas.job_schema import DeleteResponse, HistoryResponse
-from app.api.routes_jobs import serialize_job
+from app.services.encryption_service import decrypt_text
 from app.utils.file_utils import remove_file_if_exists
 
 
@@ -21,32 +22,27 @@ def list_history(
     keyword: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> HistoryResponse:
-    filters = []
-    if keyword:
-        query_keyword = f"%{keyword.strip()}%"
-        filters.append(
-            or_(
-                GenerationJob.source_text.ilike(query_keyword),
-                GenerationJob.translated_text.ilike(query_keyword),
-            )
-        )
-
-    total = db.scalar(select(func.count()).select_from(GenerationJob).where(*filters)) or 0
-    jobs = (
-        db.execute(
-            select(GenerationJob)
-            .options(selectinload(GenerationJob.outputs))
-            .where(*filters)
-            .order_by(GenerationJob.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-        .scalars()
-        .all()
+    query = (
+        select(GenerationJob)
+        .options(selectinload(GenerationJob.outputs))
+        .order_by(GenerationJob.created_at.desc())
     )
+    jobs = db.execute(query).scalars().all()
+
+    if keyword and keyword.strip():
+        normalized_keyword = keyword.strip().lower()
+        jobs = [
+            job
+            for job in jobs
+            if normalized_keyword in (decrypt_text(job.source_text) or "").lower()
+            or normalized_keyword in (decrypt_text(job.translated_text) or "").lower()
+        ]
+
+    total = len(jobs)
+    paged_jobs = jobs[(page - 1) * page_size : page * page_size]
 
     return HistoryResponse(
-        items=[serialize_job(job) for job in jobs],
+        items=[serialize_job(job) for job in paged_jobs],
         total=total,
         page=page,
         page_size=page_size,
@@ -73,4 +69,3 @@ def delete_history(job_id: str, db: Session = Depends(get_db)) -> DeleteResponse
     db.delete(job)
     db.commit()
     return DeleteResponse(success=True)
-

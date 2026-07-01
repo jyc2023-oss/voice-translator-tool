@@ -8,6 +8,7 @@ from mutagen.mp3 import MP3
 from app.core.config import settings
 from app.core.errors import ExternalServiceError
 from app.schemas.job_schema import VoiceCatalogItem
+from app.utils.error_utils import summarize_http_error
 
 
 VOICE_SETTINGS = {
@@ -30,8 +31,7 @@ async def list_voices() -> list[VoiceCatalogItem]:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        detail = exc.response.text[:500]
-        raise ExternalServiceError(f"读取 ElevenLabs 音色列表失败：{detail}", status_code=502) from exc
+        raise ExternalServiceError(summarize_http_error("读取 ElevenLabs 音色列表失败", exc), status_code=502) from exc
     except httpx.HTTPError as exc:
         raise ExternalServiceError("读取 ElevenLabs 音色列表失败，请检查网络或 API Key。", status_code=502) from exc
 
@@ -95,8 +95,7 @@ async def synthesize_speech(text: str, voice_id: str, target_path: Path) -> floa
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        detail = exc.response.text[:500]
-        raise ExternalServiceError(f"语音合成失败：{detail}", status_code=502) from exc
+        raise ExternalServiceError(summarize_http_error("语音合成失败", exc), status_code=502) from exc
     except httpx.HTTPError as exc:
         raise ExternalServiceError("ElevenLabs 连接失败，请检查网络或 API Key。", status_code=502) from exc
 

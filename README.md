@@ -1,40 +1,24 @@
 # VoiceBridge Studio
 
-中文短视频口播文案一键改写成自然英文口播稿，并生成可试听、可下载的英文语音。项目面向 AI 工程实习笔试场景，强调可运行、可演示、可部署，而不是停留在单页 Demo。
+将中文短视频口播文案一键改写成自然英文口播，并生成可试听、可下载的英文语音。项目面向 AI 工程师笔试场景，强调可运行、可演示、可部署。
 
 ## 在线能力概览
 
 - 中文文案提交、长度校验、错误提示
-- DeepSeek / OpenAI-compatible 翻译链路
+- OpenAI-compatible / DeepSeek 翻译链路
 - ElevenLabs 多音色异步生成
 - 任务状态轮询：`pending` / `translating` / `synthesizing` / `completed` / `failed`
-- 英文复制、音频播放下载、逐句高亮近似版
+- 英文文案复制、音频播放下载、逐句高亮
 - 历史记录搜索、复用、删除
-- 可视化多音色选择，支持 ElevenLabs 动态音色列表与自定义 `Voice ID`
+- ElevenLabs 动态音色列表与默认音色配置
 
-## 技术架构
+## 技术栈
 
 ```text
 frontend/  React + Vite + TypeScript
 backend/   FastAPI + SQLAlchemy + SQLite
 storage/   Local audio files + SQLite metadata
 ```
-
-主流程：
-
-1. 前端提交中文口播文案与音色列表
-2. 后端创建任务并异步调用翻译模型
-3. 翻译结果写回数据库后，并发调用 ElevenLabs TTS
-4. 音频文件写入本地目录，历史记录写入 SQLite
-5. 前端轮询任务状态并展示翻译、音频与历史记录
-
-## 项目亮点
-
-- 翻译目标不是直译，而是适合英文口播的广告式改写
-- 多音色并发生成，不因单个音色失败而拖垮整个任务
-- 前后端分离，密钥只保存在后端
-- 逐句高亮采用可解释的时间估算策略，适合作为笔试演示版
-- 已准备本地开发脚本、部署配置和环境变量模板
 
 ## 本地运行
 
@@ -53,14 +37,12 @@ python -m uvicorn app.main:app --reload
 cd frontend
 copy .env.example .env
 npm install
-npx vite --host 127.0.0.1 --port 5173
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
 ### 一键启动
 
-项目根目录已提供 [`start-dev.bat`](</D:/大学课程/实习/线上电商/start-dev.bat:1>)。
-
-双击后会打开两个窗口：
+根目录提供了 `start-dev.bat`。
 
 - 前端：`http://127.0.0.1:5173`
 - 后端文档：`http://127.0.0.1:8000/docs`
@@ -73,6 +55,7 @@ npx vite --host 127.0.0.1 --port 5173
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.deepseek.com
 OPENAI_MODEL=deepseek-v4-flash
+FIELD_ENCRYPTION_KEY=
 
 ELEVENLABS_API_KEY=
 ELEVENLABS_DEFAULT_VOICE_ID=EXAVITQu4vr4xnSDxMaL
@@ -96,74 +79,69 @@ AUDIO_DIR=./audio
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-## 数据落盘位置
+## 数据位置
 
-- 历史记录数据库：[`backend/app.db`](</D:/大学课程/实习/线上电商/backend/app.db>)
-- 音频目录：[`backend/audio`](</D:/大学课程/实习/线上电商/backend/audio>)
+- 数据库：`backend/app.db`
+- 音频目录：`backend/audio`
+
+## 安全增强
+
+- 浏览器到前端、前端到后端、后端到第三方 API 全链路通过 HTTPS 部署
+- 后端新增基础安全响应头：`HSTS`、`X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy`
+- 数据库敏感字段支持应用层加密：`source_text`、`translated_text`、`error_message`
+- 字段加密依赖环境变量 `FIELD_ENCRYPTION_KEY`
+- 历史搜索会先解密再做内存筛选，适合当前演示规模
+
+### 生成 Fernet 密钥
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### 迁移已有明文历史数据
+
+```bash
+cd backend
+python -m scripts.migrate_encrypt_existing_jobs
+```
 
 ## API
 
-- `POST /api/jobs` 创建任务
-- `GET /api/jobs/{job_id}` 查询任务
-- `GET /api/history` 获取历史记录
-- `DELETE /api/history/{job_id}` 删除历史记录
-- `GET /api/health` 健康检查
+- `POST /api/jobs`：创建任务
+- `GET /api/jobs/{job_id}`：查询任务
+- `GET /api/history`：获取历史记录
+- `DELETE /api/history/{job_id}`：删除历史记录
+- `GET /api/health`：健康检查
 
-## 部署方案
+## 部署
 
 ### 前端部署到 Vercel
 
-建议把 Vercel 的 Root Directory 设为 `frontend`，项目中已提供 [`frontend/vercel.json`](</D:/大学课程/实习/线上电商/frontend/vercel.json:1>)。
-
-需要设置环境变量：
-
-```env
-VITE_API_BASE_URL=https://your-render-backend.onrender.com
-```
+- Root Directory：`frontend`
+- 环境变量：`VITE_API_BASE_URL=https://your-render-backend.onrender.com`
 
 ### 后端部署到 Render
 
-项目根目录已提供 [`render.yaml`](</D:/大学课程/实习/线上电商/render.yaml:1>)，适合直接走 Blueprint 部署。
+项目根目录提供 `render.yaml`，可直接按 Blueprint 部署。
 
-需要在 Render 中补齐这些环境变量：
+需要补齐这些环境变量：
 
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
+- `FIELD_ENCRYPTION_KEY`
 - `ELEVENLABS_API_KEY`
 - `ELEVENLABS_DEFAULT_VOICE_ID`
 - `BACKEND_URL`
 - `FRONTEND_URL`
 
-`render.yaml` 里已经预设：
+## 已知限制
 
-- `buildCommand: pip install -r requirements.txt`
-- `startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- 免费版可直接部署，不依赖磁盘挂载
-
-### 官方参考
-
-- Vercel 文档：`https://vercel.com/docs`
-- Render Python 文档：`https://render.com/docs/deploy-fastapi`
-- Render Blueprint 文档：`https://render.com/docs/blueprint-spec`
-
-## 建议提交物
-
-- 公网可访问的前端链接
-- 后端 Swagger 链接
-- GitHub 仓库
-- 录屏演示
-- README
-- 功能截图
-
-## 已知限制与后续优化
-
-- 逐句高亮目前是估算版，不是强制对齐版
-- 页面会动态读取 ElevenLabs 音色，但“免费可用”仍是基于 `premade` 分类做经验性提示，不等同于官方套餐承诺
-- 默认会把 ElevenLabs TTS 并发限制在 `2`，用于避开免费/低套餐常见的并发上限；如果你升级套餐，可以调高 `ELEVENLABS_MAX_CONCURRENCY`
-- Render 免费套餐不支持持久化磁盘，因此重新部署或休眠唤醒后，本地 SQLite 历史记录和音频文件可能丢失；笔试演示阶段可接受，正式上线建议接对象存储和托管数据库
-- 还未加入限流、鉴权、监控、结构化日志
-- 正式线上建议把音频迁移到对象存储，而不是继续使用本地目录
+- 逐句高亮当前为估算版，不是强制对齐版
+- “推荐免费可用” 仅依据 `premade` 分类做经验提示，不等同于 ElevenLabs 套餐承诺
+- 默认将 ElevenLabs 并发限制为 `2`，用于规避低套餐并发上限
+- Render 免费实例不提供持久化磁盘，重部署后本地 SQLite 与音频可能丢失
+- 若未配置 `FIELD_ENCRYPTION_KEY`，系统仍能兼容旧数据运行，但不会启用数据库字段加密
 
 ## 安全提醒
 

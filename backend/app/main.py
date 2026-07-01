@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes_audio import router as audio_router
@@ -18,13 +19,27 @@ def create_app() -> FastAPI:
     ensure_audio_dir()
 
     app = FastAPI(title=settings.app_name)
+
+    if settings.backend_url.startswith("https://"):
+        app.add_middleware(HTTPSRedirectMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url, "http://127.0.0.1:5173"],
+        allow_origins=[settings.frontend_url, "http://127.0.0.1:5173", "http://localhost:5173"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
     app.include_router(jobs_router)
     app.include_router(history_router)
@@ -39,4 +54,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

@@ -1,0 +1,10 @@
+INFO:     127.0.0.1:49744 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61697 - "GET /api/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61697 - "GET /api/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60401 - "GET /api/audio/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60401 - "GET /api/audio/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54797 - "OPTIONS /api/jobs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54797 - "POST /api/jobs HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:54797 - "GET /api/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54797 - "GET /api/jobs/8b23cf7d-b85a-4f3b-bdd8-167ecf778c10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54797 - "GET /api/history HTTP/1.1" 200 OK

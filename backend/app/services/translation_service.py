@@ -4,6 +4,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.errors import ExternalServiceError
+from app.utils.error_utils import summarize_http_error
 from app.utils.text_utils import validate_translation
 
 
@@ -45,8 +46,7 @@ async def translate_text(source_text: str) -> str:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        detail = exc.response.text[:500]
-        raise ExternalServiceError(f"翻译模型请求失败：{detail}", status_code=502) from exc
+        raise ExternalServiceError(summarize_http_error("翻译模型请求失败", exc), status_code=502) from exc
     except httpx.HTTPError as exc:
         raise ExternalServiceError("翻译模型连接失败，请检查网络或 Base URL。", status_code=502) from exc
 
@@ -56,4 +56,3 @@ async def translate_text(source_text: str) -> str:
     if choices:
         content = choices[0].get("message", {}).get("content", "")
     return validate_translation(source_text, content)
-
